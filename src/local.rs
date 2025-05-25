@@ -3,10 +3,10 @@
 
 use core::{alloc::Layout, mem::ManuallyDrop, ptr::NonNull};
 
-use allocator_api2::alloc::{AllocError, Allocator};
-
-#[cfg(feature = "alloc")]
-use allocator_api2::alloc::Global;
+#[cfg(not(feature = "nightly"))]
+use allocator_api2::alloc::{AllocError, Allocator, Global};
+#[cfg(feature = "nightly")]
+use std::alloc::{AllocError, Allocator, Global};
 
 use crate::{api::BlinkAllocator, arena::ArenaLocal};
 
@@ -305,9 +305,9 @@ where
         ptr: NonNull<u8>,
         old_layout: Layout,
         new_layout: Layout,
-    ) -> Result<NonNull<[u8]>, AllocError> {
+    ) -> Result<NonNull<[u8]>, AllocError> { unsafe {
         BlinkAlloc::resize(self, ptr, old_layout, new_layout)
-    }
+    }}
 
     #[inline(always)]
     unsafe fn grow(
@@ -315,14 +315,14 @@ where
         ptr: NonNull<u8>,
         old_layout: Layout,
         new_layout: Layout,
-    ) -> Result<NonNull<[u8]>, AllocError> {
+    ) -> Result<NonNull<[u8]>, AllocError> { unsafe {
         BlinkAlloc::resize(self, ptr, old_layout, new_layout)
-    }
+    }}
 
     #[inline(always)]
-    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
+    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) { unsafe {
         BlinkAlloc::deallocate(self, ptr, layout.size());
-    }
+    }}
 }
 
 unsafe impl<A> Allocator for &mut BlinkAlloc<A>
@@ -345,9 +345,9 @@ where
         ptr: NonNull<u8>,
         old_layout: Layout,
         new_layout: Layout,
-    ) -> Result<NonNull<[u8]>, AllocError> {
+    ) -> Result<NonNull<[u8]>, AllocError> { unsafe {
         BlinkAlloc::resize(self, ptr, old_layout, new_layout)
-    }
+    }}
 
     #[inline(always)]
     unsafe fn grow(
@@ -355,14 +355,14 @@ where
         ptr: NonNull<u8>,
         old_layout: Layout,
         new_layout: Layout,
-    ) -> Result<NonNull<[u8]>, AllocError> {
+    ) -> Result<NonNull<[u8]>, AllocError> { unsafe {
         BlinkAlloc::resize(self, ptr, old_layout, new_layout)
-    }
+    }}
 
     #[inline(always)]
-    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
+    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) { unsafe {
         BlinkAlloc::deallocate(self, ptr, layout.size());
-    }
+    }}
 }
 
 unsafe impl<A> BlinkAllocator for BlinkAlloc<A>

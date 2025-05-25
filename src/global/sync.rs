@@ -7,7 +7,10 @@ use core::{
 #[cfg(debug_assertions)]
 use core::sync::atomic::{AtomicU64, Ordering};
 
-use allocator_api2::alloc::{AllocError, Allocator};
+#[cfg(not(feature = "nightly"))]
+use allocator_api2::alloc::{AllocError, Allocator, Global};
+#[cfg(feature = "nightly")]
+use std::alloc::{AllocError, Allocator, Global};
 
 use crate::{cold, sync::SyncBlinkAlloc, LocalBlinkAlloc};
 

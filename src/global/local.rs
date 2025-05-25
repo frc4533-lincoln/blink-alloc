@@ -7,7 +7,10 @@ use core::{
 #[cfg(debug_assertions)]
 use core::cell::Cell;
 
+#[cfg(not(feature = "nightly"))]
 use allocator_api2::alloc::{AllocError, Allocator};
+#[cfg(feature = "nightly")]
+use std::alloc::{AllocError, Allocator};
 
 use crate::{cold, local::BlinkAlloc};
 
@@ -45,7 +48,7 @@ impl<A: Allocator> State<A> {
         ptr: NonNull<u8>,
         old_layout: Layout,
         new_layout: Layout,
-    ) -> Result<NonNull<[u8]>, AllocError> {
+    ) -> Result<NonNull<[u8]>, AllocError> { unsafe {
         match self.enabled {
             true => self.blink.resize(ptr, old_layout, new_layout),
             false => {
@@ -57,10 +60,10 @@ impl<A: Allocator> State<A> {
                 }
             }
         }
-    }
+    }}
 
     #[inline(always)]
-    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
+    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) { unsafe {
         match self.enabled {
             true => self.blink.deallocate(ptr, layout.size()),
             false => {
@@ -68,7 +71,7 @@ impl<A: Allocator> State<A> {
                 self.blink.inner().deallocate(ptr, layout)
             }
         }
-    }
+    }}
 }
 
 switch_std_default! {
@@ -113,9 +116,9 @@ impl UnsafeGlobalBlinkAlloc<std::alloc::System> {
     /// let _ = Box::new(42);
     /// let _ = vec![1, 2, 3];
     /// ```
-    pub const unsafe fn new() -> Self {
+    pub const unsafe fn new() -> Self { unsafe {
         UnsafeGlobalBlinkAlloc::new_in(std::alloc::System)
-    }
+    }}
 
     /// Create a new [`UnsafeGlobalBlinkAlloc`].
     ///
@@ -146,9 +149,9 @@ impl UnsafeGlobalBlinkAlloc<std::alloc::System> {
     /// # }
     /// # #[cfg(not(feature = "std"))] fn main() {}
     /// ```
-    pub const unsafe fn with_chunk_size(chunk_size: usize) -> Self {
+    pub const unsafe fn with_chunk_size(chunk_size: usize) -> Self { unsafe {
         UnsafeGlobalBlinkAlloc::with_chunk_size_in(chunk_size, std::alloc::System)
-    }
+    }}
 }
 
 impl<A> UnsafeGlobalBlinkAlloc<A>
@@ -271,14 +274,14 @@ where
     /// # #[cfg(not(feature = "std"))] fn main() {}
     /// ```
     #[inline(always)]
-    pub unsafe fn reset(&self) {
+    pub unsafe fn reset(&self) { unsafe {
         #[cfg(debug_assertions)]
         {
             assert_eq!(self.allocations.get(), 0, "Not everything was deallocated");
         }
 
         (*self.state.get()).blink.reset_unchecked();
-    }
+    }}
 
     /// Switches allocator to blink mode.
     /// All allocations will be served by blink-allocator.
@@ -294,9 +297,9 @@ where
     /// Must be externally synchronized with other threads accessing this allocator.
     /// Memory allocated in direct mode must not be deallocated while in blink mode.
     #[inline(always)]
-    pub unsafe fn blink_mode(&self) {
+    pub unsafe fn blink_mode(&self) { unsafe {
         (*self.state.get()).enabled = true;
-    }
+    }}
 
     /// Switches allocator to blink mode.
     /// All allocations will be served by underlying allocator.
@@ -312,10 +315,10 @@ where
     /// Must be externally synchronized with other threads accessing this allocator.
     /// Memory allocated in blink mode must not be deallocated while in direct mode.
     #[inline(always)]
-    pub unsafe fn direct_mode(&self) {
+    pub unsafe fn direct_mode(&self) { unsafe {
         self.reset();
         (*self.state.get()).enabled = false;
-    }
+    }}
 }
 
 unsafe impl<A> GlobalAlloc for UnsafeGlobalBlinkAlloc<A>
@@ -323,7 +326,7 @@ where
     A: Allocator,
 {
     #[inline]
-    unsafe fn alloc(&self, layout: core::alloc::Layout) -> *mut u8 {
+    unsafe fn alloc(&self, layout: core::alloc::Layout) -> *mut u8 { unsafe {
         match (*self.state.get()).allocate(layout) {
             Ok(ptr) => {
                 #[cfg(debug_assertions)]
@@ -334,10 +337,10 @@ where
             }
             Err(_) => null_mut(),
         }
-    }
+    }}
 
     #[inline]
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: core::alloc::Layout) {
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: core::alloc::Layout) { unsafe {
         let ptr = NonNull::new_unchecked(ptr);
         (*self.state.get()).deallocate(ptr, layout);
         #[cfg(debug_assertions)]
@@ -345,10 +348,10 @@ where
             self.allocations
                 .set(self.allocations.get().saturating_sub(1));
         }
-    }
+    }}
 
     #[inline]
-    unsafe fn alloc_zeroed(&self, layout: core::alloc::Layout) -> *mut u8 {
+    unsafe fn alloc_zeroed(&self, layout: core::alloc::Layout) -> *mut u8 { unsafe {
         match (*self.state.get()).allocate_zeroed(layout) {
             Ok(ptr) => {
                 #[cfg(debug_assertions)]
@@ -359,7 +362,7 @@ where
             }
             Err(_) => null_mut(),
         }
-    }
+    }}
 
     #[inline]
     unsafe fn realloc(
@@ -367,7 +370,7 @@ where
         ptr: *mut u8,
         layout: core::alloc::Layout,
         new_size: usize,
-    ) -> *mut u8 {
+    ) -> *mut u8 { unsafe {
         let Ok(new_layout) = Layout::from_size_align(new_size, layout.align()) else {
             return null_mut();
         };
@@ -381,5 +384,5 @@ where
             Ok(ptr) => ptr.as_ptr().cast(),
             Err(_) => null_mut(),
         }
-    }
+    }}
 }

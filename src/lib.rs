@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(feature = "nightly", feature(allocator_api))]
+#![deny(unused_unsafe)]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -97,11 +98,11 @@ impl<T> ResultExt<T> for Result<T, core::convert::Infallible> {
 }
 
 #[inline]
-unsafe fn in_place<'a, T, I>(ptr: *mut T, init: I, f: impl FnOnce(I) -> T) -> &'a mut T {
+unsafe fn in_place<'a, T, I>(ptr: *mut T, init: I, f: impl FnOnce(I) -> T) -> &'a mut T { unsafe {
     // Ask compiler very nicely to store return directly into memory.
     core::ptr::write(ptr, f(init));
     &mut *ptr
-}
+}}
 
 #[cold]
 fn cold() {}

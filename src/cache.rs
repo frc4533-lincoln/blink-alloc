@@ -6,7 +6,10 @@ use core::{
 
 use alloc::vec::Vec;
 
-use allocator_api2::alloc::{Allocator, Global};
+#[cfg(not(feature = "nightly"))]
+use allocator_api2::alloc::{AllocError, Allocator, Global};
+#[cfg(feature = "nightly")]
+use std::alloc::{AllocError, Allocator, Global};
 use parking_lot::RwLock;
 
 use crate::local::BlinkAlloc;

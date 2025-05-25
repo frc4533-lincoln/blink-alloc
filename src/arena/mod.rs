@@ -11,7 +11,10 @@ use core::{
     sync::atomic::{AtomicPtr, Ordering},
 };
 
+#[cfg(not(feature = "nightly"))]
 use allocator_api2::alloc::{AllocError, Allocator};
+#[cfg(feature = "nightly")]
+use std::alloc::{AllocError, Allocator};
 
 use crate::cold;
 
@@ -50,6 +53,7 @@ pub(crate) trait CasPtr {
     #[allow(dead_code)]
     fn new(value: *mut u8) -> Self;
     fn load(&self, order: Ordering) -> *mut u8;
+    #[allow(dead_code)]
     fn set(&mut self, value: *mut u8);
     fn compare_exchange(
         &self,
@@ -184,7 +188,7 @@ macro_rules! with_cursor {
                 size: usize,
                 allocator: impl Allocator,
                 prev: Option<NonNull<Self>>,
-            ) -> Result<NonNull<Self>, AllocError> {
+            ) -> Result<NonNull<Self>, AllocError> { unsafe {
                 let Some(size) = align_up(size, align_of::<Self>()) else {
                     return Err(AllocError);
                 };
@@ -192,28 +196,28 @@ macro_rules! with_cursor {
                 // Safety:
                 // size + (align - 1) hasn't overflow above.
                 // `align_of` returns valid align value.
-                let layout = unsafe { Layout::from_size_align_unchecked(size, align_of::<Self>()) };
+                let layout = Layout::from_size_align_unchecked(size, align_of::<Self>());
                 let slice = allocator.allocate(layout)?;
                 Ok(Self::init_chunk(slice, prev))
-            }
+            }}
 
             #[inline]
             unsafe fn dealloc_chunk(
                 chunk: NonNull<Self>,
                 allocator: impl Allocator,
-            ) -> Option<NonNull<Self>> {
-                let me = unsafe { chunk.as_ref() };
+            ) -> Option<NonNull<Self>> { unsafe {
+                let me = chunk.as_ref();
                 let prev = me.prev;
 
-                let size = unsafe { me.end.offset_from(chunk.as_ptr().cast()) } as usize;
+                let size = me.end.offset_from(chunk.as_ptr().cast()) as usize;
 
                 // Safety:
                 // Making layout of actual allocation.
-                let layout = unsafe { Layout::from_size_align_unchecked(size, align_of::<Self>()) };
+                let layout = Layout::from_size_align_unchecked(size, align_of::<Self>());
 
                 allocator.deallocate(chunk.cast(), layout);
                 prev
-            }
+            }}
 
             /// # Safety
             ///
@@ -225,7 +229,7 @@ macro_rules! with_cursor {
             unsafe fn init_chunk(
                 slice: NonNull<[u8]>,
                 prev: Option<NonNull<Self>>,
-            ) -> NonNull<Self> {
+            ) -> NonNull<Self> { unsafe {
                 let len = slice.len();
                 let ptr = slice.as_ptr().cast::<u8>();
                 debug_assert!(is_aligned_to(ptr as usize, align_of::<Self>()));
@@ -239,7 +243,7 @@ macro_rules! with_cursor {
                 let cumulative_size = match prev {
                     None => 0,
                     Some(prev) => {
-                        let prev = unsafe { prev.as_ref() };
+                        let prev = prev.as_ref();
                         prev.cap() + prev.cumulative_size
                     }
                 };
@@ -254,7 +258,7 @@ macro_rules! with_cursor {
                     },
                 );
                 NonNull::new_unchecked(header_ptr)
-            }
+            }}
 
             #[inline(always)]
             fn base(&self) -> *const u8 {
@@ -358,9 +362,9 @@ macro_rules! with_cursor {
                 ptr: NonNull<u8>,
                 old_layout: Layout,
                 new_layout: Layout,
-            ) -> Option<NonNull<[u8]>> {
+            ) -> Option<NonNull<[u8]>> { unsafe {
                 // Safety: `chunk` is a valid pointer to chunk allocation.
-                let me = unsafe { chunk.as_ref() };
+                let me = chunk.as_ref();
 
                 let addr = ptr.as_ptr() as usize;
                 if old_layout.align() >= new_layout.align() {
@@ -371,7 +375,7 @@ macro_rules! with_cursor {
                     } else {
                         // Safety:
                         // `ptr + old_layout.size()` is within allocation or one by past end.
-                        let old_end = unsafe { ptr.as_ptr().add(old_layout.size()) };
+                        let old_end = ptr.as_ptr().add(old_layout.size());
 
                         let cursor = me.cursor.load(Ordering::Relaxed);
                         if cursor == old_end {
@@ -383,7 +387,7 @@ macro_rules! with_cursor {
                                 return None;
                             }
 
-                            let next = unsafe { ptr.as_ptr().add(new_layout.size()) };
+                            let next = ptr.as_ptr().add(new_layout.size());
 
                             let result = CasPtr::compare_exchange(
                                 &me.cursor,
@@ -420,17 +424,17 @@ macro_rules! with_cursor {
 
                 // Deallocation is not possible.
                 Some(new_ptr)
-            }
+            }}
 
             // Safety: `chunk` must be a pointer to the valid chunk allocation.
             #[inline(always)]
-            unsafe fn reset(mut chunk: NonNull<Self>) -> Option<NonNull<Self>> {
+            unsafe fn reset(mut chunk: NonNull<Self>) -> Option<NonNull<Self>> { unsafe {
                 let me = chunk.as_mut();
                 let base = me.end.sub(me.cap());
                 me.cursor.set(base);
                 me.cumulative_size = 0;
                 me.prev.take()
-            }
+            }}
 
             // Safety: `chunk` must be a pointer to the valid chunk allocation.
             // `ptr` must be a pointer to the allocated memory of at least `size` bytes.
@@ -462,7 +466,7 @@ macro_rules! with_cursor {
             mut chunk_size: usize,
             layout: Layout,
             allocator: impl Allocator,
-        ) -> Result<NonNull<[u8]>, AllocError> {
+        ) -> Result<NonNull<[u8]>, AllocError> { unsafe {
             if let Some(root) = root.get() {
                 chunk_size = chunk_size.max(root.as_ref().cumulative_size);
                 chunk_size = chunk_size
@@ -492,11 +496,11 @@ macro_rules! with_cursor {
             let new_chunk = ChunkHeader::alloc_chunk(chunk_size, allocator, root.get())?;
 
             // Safety: `chunk` is a valid pointer to chunk allocation.
-            let ptr = unsafe { ChunkHeader::alloc(new_chunk, layout).unwrap_unchecked() };
+            let ptr = ChunkHeader::alloc(new_chunk, layout).unwrap_unchecked();
 
             root.set(Some(new_chunk));
             Ok(ptr)
-        }
+        }}
 
         #[cold]
         pub unsafe fn resize_slow(
@@ -506,7 +510,7 @@ macro_rules! with_cursor {
             old_layout: Layout,
             new_layout: Layout,
             allocator: impl Allocator,
-        ) -> Result<NonNull<[u8]>, AllocError> {
+        ) -> Result<NonNull<[u8]>, AllocError> { unsafe {
             let new_ptr = alloc_slow(root, chunk_size, new_layout, allocator)?;
             core::ptr::copy_nonoverlapping(
                 ptr.as_ptr(),
@@ -515,7 +519,7 @@ macro_rules! with_cursor {
             );
             // Deallocation is impossible.
             Ok(new_ptr)
-        }
+        }}
 
         #[inline(always)]
         pub unsafe fn dealloc(root: Option<NonNull<ChunkHeader>>, ptr: NonNull<u8>, size: usize) {

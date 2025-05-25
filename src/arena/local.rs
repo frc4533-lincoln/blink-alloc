@@ -63,9 +63,9 @@ impl ArenaLocal {
         &self,
         layout: Layout,
         allocator: impl Allocator,
-    ) -> Result<NonNull<[u8]>, AllocError> {
+    ) -> Result<NonNull<[u8]>, AllocError> { unsafe {
         alloc_slow(&self.root, self.min_chunk_size.get(), layout, allocator)
-    }
+    }}
 
     #[inline(always)]
     pub unsafe fn resize_fast(
@@ -87,7 +87,7 @@ impl ArenaLocal {
         old_layout: Layout,
         new_layout: Layout,
         allocator: impl Allocator,
-    ) -> Result<NonNull<[u8]>, AllocError> {
+    ) -> Result<NonNull<[u8]>, AllocError> { unsafe {
         resize_slow(
             &self.root,
             self.min_chunk_size.get(),
@@ -96,12 +96,12 @@ impl ArenaLocal {
             new_layout,
             allocator,
         )
-    }
+    }}
 
     #[inline(always)]
-    pub unsafe fn dealloc(&self, ptr: NonNull<u8>, size: usize) {
+    pub unsafe fn dealloc(&self, ptr: NonNull<u8>, size: usize) { unsafe {
         dealloc(self.root.get(), ptr, size)
-    }
+    }}
 
     #[inline(always)]
     pub unsafe fn reset(&mut self, keep_last: bool, allocator: impl Allocator) {

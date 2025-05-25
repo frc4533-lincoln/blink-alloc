@@ -8,8 +8,11 @@ use core::{
     ptr::{self, NonNull},
 };
 
-#[cfg(feature = "alloc")]
+#[cfg(all(feature = "alloc", not(feature = "nightly")))]
 use allocator_api2::alloc::Global;
+#[cfg(all(feature = "alloc", feature = "nightly"))]
+use std::alloc::Global;
+
 
 use crate::{
     api::BlinkAllocator,
@@ -305,7 +308,7 @@ where
     ) -> Result<&'a mut [T], E>
     where
         T: Copy,
-    {
+    { unsafe {
         let layout = Layout::for_value(slice);
         let Ok(ptr) = self.alloc.allocate(layout) else {
             return Err(alloc_err(layout));
@@ -314,7 +317,7 @@ where
         let ptr = ptr.as_ptr().cast();
         core::ptr::copy_nonoverlapping(slice.as_ptr(), ptr, slice.len());
         Ok(core::slice::from_raw_parts_mut(ptr, slice.len()))
-    }
+    }}
 
     unsafe fn _try_emplace_drop<'a, T, I, G: 'a, E>(
         &'a self,
@@ -322,7 +325,7 @@ where
         f: impl FnOnce(&mut EmplaceSlot<T, G>, I),
         err: impl FnOnce(G) -> E,
         alloc_err: impl FnOnce(I, Layout) -> E,
-    ) -> Result<&'a mut T, E> {
+    ) -> Result<&'a mut T, E> { unsafe {
         let layout = Layout::new::<DropItem<Result<T, ManuallyDrop<E>>>>();
 
         let Ok(ptr) = self.alloc.allocate(layout) else {
@@ -330,7 +333,7 @@ where
         };
 
         // Safety: `item_ptr` is a valid pointer to allocated memory for type `DropItem<T>`.
-        let item = unsafe { DropItem::init_value(ptr.cast(), init, f) };
+        let item = DropItem::init_value(ptr.cast(), init, f);
 
         if item.value.is_ok() {
             match self.drop_list.add(item) {
@@ -341,14 +344,14 @@ where
 
         match &mut item.value {
             Err(g) => {
-                let err = err(unsafe { ManuallyDrop::take(g) });
+                let err = err(ManuallyDrop::take(g));
                 // Give memory back.
                 self.alloc.deallocate(ptr.cast(), layout);
                 Err(err)
             }
             _ => unreachable!(),
         }
-    }
+    }}
 
     unsafe fn _try_emplace_no_drop<'a, T, I, G: 'a, E>(
         &self,
@@ -356,7 +359,7 @@ where
         f: impl FnOnce(&mut EmplaceSlot<T, G>, I),
         err: impl FnOnce(G) -> E,
         alloc_err: impl FnOnce(I, Layout) -> E,
-    ) -> Result<&'a mut T, E> {
+    ) -> Result<&'a mut T, E> { unsafe {
         let layout = Layout::new::<T>();
         let Ok(ptr) = self.alloc.allocate(layout) else {
             return Err(alloc_err(init, layout));
@@ -372,13 +375,13 @@ where
         match uninit.assume_init_mut() {
             Ok(value) => Ok(value),
             Err(g) => {
-                let err = err(unsafe { ManuallyDrop::take(g) });
+                let err = err(ManuallyDrop::take(g));
                 // Give memory back.
                 self.alloc.deallocate(ptr.cast(), layout);
                 Err(err)
             }
         }
-    }
+    }}
 
     /// Allocates memory for a value and emplaces value into the memory
     /// using init value and provided closure.
@@ -393,13 +396,13 @@ where
         no_drop: bool,
         err: impl FnOnce(G) -> E,
         alloc_err: impl FnOnce(I, Layout) -> E,
-    ) -> Result<&'a mut T, E> {
+    ) -> Result<&'a mut T, E> { unsafe {
         if !needs_drop::<T>() || no_drop {
             self._try_emplace_no_drop(init, f, err, alloc_err)
         } else {
             self._try_emplace_drop(init, f, err, alloc_err)
         }
-    }
+    }}
 
     unsafe fn _try_emplace_drop_from_iter<'a, T: 'a, I, E>(
         &'a self,
@@ -408,7 +411,7 @@ where
     ) -> Result<&'a mut [T], E>
     where
         I: Iterator<Item = T>,
-    {
+    { unsafe {
         if size_of::<T>() == 0 {
             let item_layout = Layout::new::<DropItem<[T; 0]>>();
             let Ok(ptr) = self.alloc.allocate(item_layout) else {
@@ -600,7 +603,7 @@ where
                 return Ok(guard.flush());
             };
         }
-    }
+    }}
 
     unsafe fn _try_emplace_no_drop_from_iter<'a, T: 'a, I, E>(
         &'a self,
@@ -609,7 +612,7 @@ where
     ) -> Result<&'a mut [T], E>
     where
         I: Iterator<Item = T>,
-    {
+    { unsafe {
         if size_of::<T>() == 0 {
             // Drain elements from iterator.
             // Stop at `usize::MAX`.
@@ -768,7 +771,7 @@ where
                 return Ok(guard.flush());
             };
         }
-    }
+    }}
 
     /// Allocates memory for a value and emplaces value into the memory
     /// using init value and provided closure.
@@ -781,16 +784,16 @@ where
         iter: I,
         no_drop: bool,
         err: impl FnOnce(&'a mut [T], Option<T>, Option<Layout>) -> E,
-    ) -> Result<&mut [T], E>
+    ) -> Result<&'a mut [T], E>
     where
         I: IntoIterator<Item = T>,
-    {
+    { unsafe {
         if !needs_drop::<T>() || no_drop {
             self._try_emplace_no_drop_from_iter(iter.into_iter(), err)
         } else {
             self._try_emplace_drop_from_iter(iter.into_iter(), err)
         }
-    }
+    }}
 }
 
 /// Provides interface for emplacing values.

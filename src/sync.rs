@@ -7,10 +7,10 @@ use core::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use allocator_api2::alloc::{AllocError, Allocator};
-
-#[cfg(feature = "alloc")]
-use allocator_api2::alloc::Global;
+#[cfg(not(feature = "nightly"))]
+use allocator_api2::alloc::{AllocError, Allocator, Global};
+#[cfg(feature = "nightly")]
+use std::alloc::{AllocError, Allocator, Global};
 
 use crate::{
     api::BlinkAllocator,
@@ -372,7 +372,9 @@ where
         old_layout: Layout,
         new_layout: Layout,
     ) -> Result<NonNull<[u8]>, AllocError> {
+        unsafe {
         SyncBlinkAlloc::resize(self, ptr, old_layout, new_layout)
+        }
     }
 
     #[inline(always)]
@@ -382,12 +384,16 @@ where
         old_layout: Layout,
         new_layout: Layout,
     ) -> Result<NonNull<[u8]>, AllocError> {
+        unsafe {
         SyncBlinkAlloc::resize(self, ptr, old_layout, new_layout)
+        }
     }
 
     #[inline(always)]
     unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
+        unsafe {
         SyncBlinkAlloc::deallocate(self, ptr, layout.size());
+        }
     }
 }
 
@@ -412,7 +418,9 @@ where
         old_layout: Layout,
         new_layout: Layout,
     ) -> Result<NonNull<[u8]>, AllocError> {
+        unsafe {
         SyncBlinkAlloc::resize(self, ptr, old_layout, new_layout)
+        }
     }
 
     #[inline(always)]
@@ -422,12 +430,16 @@ where
         old_layout: Layout,
         new_layout: Layout,
     ) -> Result<NonNull<[u8]>, AllocError> {
+        unsafe {
         SyncBlinkAlloc::resize(self, ptr, old_layout, new_layout)
+        }
     }
 
     #[inline(always)]
     unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
+        unsafe {
         SyncBlinkAlloc::deallocate(self, ptr, layout.size());
+        }
     }
 }
 
@@ -583,7 +595,9 @@ where
         old_layout: Layout,
         new_layout: Layout,
     ) -> Result<NonNull<[u8]>, AllocError> {
+        unsafe {
         LocalBlinkAlloc::resize(self, ptr, old_layout, new_layout)
+        }
     }
 
     #[inline(always)]
@@ -593,12 +607,16 @@ where
         old_layout: Layout,
         new_layout: Layout,
     ) -> Result<NonNull<[u8]>, AllocError> {
+        unsafe {
         LocalBlinkAlloc::resize(self, ptr, old_layout, new_layout)
+        }
     }
 
     #[inline(always)]
     unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
+        unsafe {
         LocalBlinkAlloc::deallocate(self, ptr, layout.size())
+        }
     }
 }
 
@@ -623,7 +641,9 @@ where
         old_layout: Layout,
         new_layout: Layout,
     ) -> Result<NonNull<[u8]>, AllocError> {
+        unsafe {
         LocalBlinkAlloc::resize(self, ptr, old_layout, new_layout)
+        }
     }
 
     #[inline(always)]
@@ -633,12 +653,16 @@ where
         old_layout: Layout,
         new_layout: Layout,
     ) -> Result<NonNull<[u8]>, AllocError> {
+        unsafe {
         LocalBlinkAlloc::resize(self, ptr, old_layout, new_layout)
+        }
     }
 
     #[inline(always)]
     unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
+        unsafe {
         LocalBlinkAlloc::deallocate(self, ptr, layout.size())
+        }
     }
 }
 

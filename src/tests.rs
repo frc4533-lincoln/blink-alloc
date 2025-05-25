@@ -40,9 +40,9 @@ fn test_bad_iter() {
             }
         }
 
-        unsafe fn deallocate(&self, ptr: core::ptr::NonNull<u8>, layout: Layout) {
+        unsafe fn deallocate(&self, ptr: core::ptr::NonNull<u8>, layout: Layout) { unsafe {
             Global.deallocate(ptr, layout)
-        }
+        }}
     }
 
     const ELEMENT_COUNT: usize = 2000;
@@ -80,9 +80,9 @@ fn test_reuse() {
             Global.allocate(layout)
         }
 
-        unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
+        unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) { unsafe {
             Global.deallocate(ptr, layout)
-        }
+        }}
     }
 
     let allocator = ControlledGlobal {

@@ -1,4 +1,7 @@
+#[cfg(not(feature = "nightly"))]
 use allocator_api2::alloc::Allocator;
+#[cfg(feature = "nightly")]
+use std::alloc::Allocator;
 
 /// Extension trait for [`Allocator`] that defines blink allocator API.
 /// Blink-allocators are allocators with cheap allocation
